@@ -1,0 +1,203 @@
+---
+title: "pre-crime_regressions"
+author: "Joya Wheatfall-Melvin"
+date: "2026-03-09"
+output: html_document
+---
+
+```{r}
+df8 <- civil_summons_2021_v8
+```
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(MASS)       # glm.nb
+library(AER)        # dispersiontest
+library(sandwich)   # robust SEs
+library(lmtest)     # coeftest
+library(car)        # vif
+library(broom)
+```
+
+```{r}
+# Collapse to officer-level
+df_officer <- df8 %>%
+  group_by(Final_Officer_Tax_ID) %>%
+  summarise(
+    Officer_Total_Summonses       = max(Officer_Total_Summonses),
+    roster_race                   = first(roster_race),
+    roster_gender                 = first(roster_gender),
+    roster_rank                   = first(roster_rank),
+    roster_command                = first(roster_command),
+    yrs_of_service                = first(yrs_of_service),
+    Total.CCRB.complaints         = first(Total.CCRB.complaints),
+    aa_total_arrests              = first(aa_total_arrests),
+    total_award_count             = first(total_award_count),
+    Reg.hours                     = first(Reg.hours),
+    Overtime.hours                = first(Overtime.hours),
+    total_calls                   = first(total_calls),
+    BoroName                      = first(BoroName),
+    month_issued                  = first(month_issued),
+    respondent_race           = first(`respondent_race`),
+    .groups = "drop"
+  )
+```
+
+
+```{r}
+# Relevel factors with correct baselines
+df_officer <- df_officer %>%
+  mutate(
+    roster_race     = relevel(factor(roster_race),     ref = "WHITE"),
+    roster_rank     = relevel(factor(roster_rank),     ref = "POLICE OFFICER"),
+    roster_gender   = as.integer(roster_gender),       # 1=MALE, 0=NOT MALE
+    BoroName        = relevel(factor(BoroName),        ref = "Manhattan"),
+    month_issued    = factor(month_issued),
+    respondent_race = relevel(factor(respondent_race), ref = "White")
+  )
+```
+
+```{r}
+#Verify distributions
+cat("--- Officer Race ---\n");       print(table(df_officer$roster_race))
+cat("\n--- Officer Rank ---\n");     print(table(df_officer$roster_rank))
+cat("\n--- Officer Gender ---\n");   print(table(df_officer$roster_gender))
+cat("\n--- Respondent Race ---\n");  print(table(df_officer$respondent_race))
+cat("\n--- BoroName ---\n");  print(table(df_officer$BoroName))
+cat("\n--- N officers ---\n");       print(nrow(df_officer))
+```
+
+```{r}
+# Model 1 — Negative Binomial WITHOUT CRIME / GEO DATA 
+# Controls: month only
+model1_nb <- glm.nb(Officer_Total_Summonses ~
+                      Total.CCRB.complaints +
+                      aa_total_arrests +
+                      roster_race +
+                      roster_gender +
+                      total_award_count +
+                      roster_rank +
+                      yrs_of_service +
+                      Reg.hours +
+                      Overtime.hours +
+                      respondent_race +
+                      month_issued,          # time control only
+                    data = df_officer)
+
+summary(model1_nb)
+```
+
+
+```{r}
+# Model 1: Incidence rate ratios
+tidy(model1_nb) %>%
+  mutate(
+    IRR      = round(exp(estimate), 3),
+    CI_lower = round(exp(estimate - 1.96 * std.error), 3),
+    CI_upper = round(exp(estimate + 1.96 * std.error), 3),
+    p_value  = round(p.value, 4)
+  ) %>%
+  dplyr::select(term, IRR, CI_lower, CI_upper, p_value) %>%
+  print(n = Inf)
+```
+
+```{r}
+cat("\n--- VIF ---\n")
+vif(model1_nb)
+```
+
+```{r}
+# Model 2 — NB with geography (BoroName) and crime (total_calls) controls
+model2_nb_geo_crime <- glm.nb(Officer_Total_Summonses ~
+                                Total.CCRB.complaints +
+                                aa_total_arrests +
+                                roster_race +
+                                roster_gender +
+                                total_award_count +
+                                roster_rank +
+                                yrs_of_service +
+                                Reg.hours +
+                                Overtime.hours +
+                                respondent_race +
+                                total_calls +          # crime/workload control
+                                BoroName +             # geography control
+                                month_issued,          # time control
+                              data = df_officer)
+
+summary(model2_nb_geo_crime)
+```
+
+
+```{r}
+# Model 2: Incidence rate ratios
+tidy(model2_nb_geo_crime) %>%
+  mutate(
+    IRR      = round(exp(estimate), 3),
+    CI_lower = round(exp(estimate - 1.96 * std.error), 3),
+    CI_upper = round(exp(estimate + 1.96 * std.error), 3),
+    p_value  = round(p.value, 4)
+  ) %>%
+  dplyr::select(term, IRR, CI_lower, CI_upper, p_value) %>%
+  print(n = Inf)
+```
+
+```{r}
+cat("\n--- VIF ---\n")
+vif(model2_nb_geo_crime)
+```
+
+```{r}
+# Compare all two models
+cat("\n--- AIC Comparison ---\n")
+AIC(model1_nb, model2_nb_geo_crime)
+```
+
+```{r}
+install.packages("stargazer")
+library(stargazer)
+
+stargazer(model1_nb, model2_nb_geo_crime,
+          type = "text",
+          column.labels = c("Month Only", "Geo + Crime Controls"),
+          digits = 3)
+```
+
+## EDA
+```{r}
+# Just want to see distribution of citations per month: month_issued12
+df_officer %>%
+  mutate(month_label = factor(month_issued,
+                              levels = 1:12,
+                              labels = c("Jan","Feb","Mar","Apr","May",
+                                         "Jun","Jul","Aug","Sep","Oct",
+                                         "Nov","Dec"))) %>%
+  ggplot(aes(x = month_label)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Distribution of Summons by Month",
+       x = "Month",
+       y = "Count") +
+  theme_minimal()
+```
+
+```{r}
+#Gender distribution
+ggplot(df_officer, aes(x = roster_gender)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Officer Gender Distribution",
+       x = "Gender",
+       y = "Count") +
+  theme_minimal()
+```
+
+
+```{r}
+# Officer Rank Distribution
+# Ran
+ggplot(df_officer, aes(x = roster_rank)) +
+  geom_bar(fill = "steelblue") +
+  labs(title = "Officer Rank Distribution",
+       x = "Rank",
+       y = "Count") +
+  theme_minimal()
+```
