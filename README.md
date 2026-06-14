@@ -1,15 +1,16 @@
 # Civil Summons Enforcement Project
 
-Repository for the Evidence for Justice Lab's civil summons data cleaning, merging, exploratory analysis, and model-building workflow.
+Repository for the Evidence for Justice Lab's 2021 civil summons data merging, cleaning, EDA, and model-building workflow.
 
-The goal of this project is to create and maintain a reproducible analysis dataset for NYC civil summons research. The repository currently documents a 2021 workflow, with versioned outputs preserved at each stage so future work can be re-created or extended to later years.
+The goal of this project is to create a reproducible analysis dataset for NYC civil summons research. The repository currently documents a 2021 workflow, with versioned outputs preserved at each stage so future work can be re-created or extended to later years. For future civil cummons years, this workflw can be replicated and/or consolidated. 
 
 ## What’s In This Repo
 
 This repository contains:
 
-- raw and semi-processed source files used in the cleaning pipeline,
-- notebook-based cleaning workflows for civil summons and officer demographic data,
+- raw 2021 civil ciations transcribed from E4J lab members, 
+- NYPD/OATH officer data,
+- notebook cleaning workflows for civil summons and officer demographic data,
 - analysis notebooks and R markdown for modeling,
 - versioned CSV outputs from each major stage,
 - archived notebook versions for traceability,
@@ -30,12 +31,21 @@ This repository contains:
 ├── 3-analysis_EDA/
 │   ├── EDA_figures/
 │   ├── archived-workbooks/
-│   ├── clean_v7_model_6.1.26.ipynb
+│   │   └── exploring_sept_citations.ipynb
 │   ├── cs_eda_workingcode_4.29.26.ipynb
 │   ├── manual-payroll-merge-data/
 │   └── payroll-roster-ccrb-data/
-├── 4-models/
-│   ├── exploring_sept_citations.ipynb
+├── 4-geocoding/
+│   ├── geocoding.ipynb
+│   └── geocoding_data/
+├── 5-arrests_911_calls/
+│   ├── 911CallCode.ipynb
+│   ├── ArrestDataCode.ipynb
+│   ├── merge_geocode_arrests.ipynb
+│   └── arrest_calls_data/
+├── 6-tidying_for_analysis/
+│   └── clean_v7_model_6.1.26.ipynb
+├── 7-models/
 │   ├── model_v8.Rmd
 │   └── model_data/
 ├── extra-data/
@@ -48,8 +58,11 @@ The project follows a staged pipeline:
 
 1. **Clean raw civil citation files**
 2. **Clean and merge officer demographic files**
-3. **Build the master analysis dataset**
-4. **Run analysis-specific cleaning and modeling**
+3. **Run Pre-Analysis EDA**
+4. **Add Geocoding data**
+5. **Add 911 Calls and Arrests data**
+6. **Tidy Data for Final Analysis**
+7. **Modelling in R** 
 
 Each stage writes a dated, versioned output so the previous step can be reproduced and audited.
 
@@ -120,7 +133,7 @@ Recommended reproduction path:
 3. Save the output as `cleaned_demographic_merge_w_Sept.csv`.
 4. Compare the output to the version committed in the repo before replacing anything.
 
-### 3) Building the Master Dataset
+### 3) Run Pre-Analysis EDA
 
 Location:
 
@@ -152,13 +165,49 @@ Recommended reproduction path:
 3. Use the notebook as the source of truth for column-by-column cleaning decisions.
 4. Confirm the notebook generates the expected `civil_summons_2021_v7` intermediate.
 
-### 4) Cleaning for Analysis and Modeling
+### 4) Geocoding
 
 Location:
 
-- `3-analysis_EDA/clean_v7_model_6.1.26.ipynb`
-- `4-models/model_v8.Rmd`
-- `4-models/model_data/civil_summons_2021_v8.csv`
+- `4-geocoding/geocoding.ipynb`
+- `4-geocoding/geocoding_data/`
+
+Purpose:
+
+- geocode civil summons addresses to geographic coordinates,
+- match addresses to census block data for spatial analysis.
+
+Recommended reproduction path:
+
+1. Start from the cleaned civil summons output.
+2. Run `4-geocoding/geocoding.ipynb`.
+3. Verify matched and unmatched outputs in `4-geocoding/geocoding_data/`.
+
+### 5) Merging Arrest and 911 Call Data
+
+Location:
+
+- `5-arrests_911_calls/ArrestDataCode.ipynb`
+- `5-arrests_911_calls/911CallCode.ipynb`
+- `5-arrests_911_calls/merge_geocode_arrests.ipynb`
+- `5-arrests_911_calls/arrest_calls_data/`
+
+Purpose:
+
+- clean and process NYPD arrest and 911 call records,
+- merge geocoded civil summons data with arrest and call data.
+
+Recommended reproduction path:
+
+1. Run `ArrestDataCode.ipynb` and `911CallCode.ipynb` to process source files.
+2. Run `merge_geocode_arrests.ipynb` to join with geocoded civil summons data.
+
+### 6) Tidying for Analysis
+
+Location:
+
+- `6-tidying_for_analysis/clean_v7_model_6.1.26.ipynb`
+- output: `7-models/model_data/civil_summons_2021_v8.csv`
 
 Purpose:
 
@@ -169,23 +218,49 @@ Purpose:
 Recommended reproduction path:
 
 1. Start from `civil_summons_2021_v7`.
-2. Run `3-analysis_EDA/clean_v7_model_6.1.26.ipynb`.
+2. Run `6-tidying_for_analysis/clean_v7_model_6.1.26.ipynb`.
 3. Verify the final cleaned analysis dataset is `civil_summons_2021_v8.csv`.
-4. Use `4-models/model_v8.Rmd` for the regression and model comparison workflow.
 
-## Analysis and Modeling Files
+### 7) Modeling
+
+Location:
+
+- `7-models/model_v8.Rmd`
+- `7-models/model_data/civil_summons_2021_v8.csv`
+
+Purpose:
+
+- run negative binomial models and EDA on the final analysis dataset.
+
+Recommended reproduction path:
+
+1. Start from `7-models/model_data/civil_summons_2021_v8.csv`.
+2. Use `7-models/model_v8.Rmd` for the regression and model comparison workflow.
 
 ### EDA notebooks
 
 - `3-analysis_EDA/cs_eda_workingcode_4.29.26.ipynb` — main analysis notebook for the master dataset.
-- `3-analysis_EDA/clean_v7_model_6.1.26.ipynb` — final analysis-specific cleaning before modeling.
-- `3-analysis_EDA/archived-workbooks/` — older notebook versions preserved for comparison and auditability.
+- `3-analysis_EDA/archived-workbooks/exploring_sept_citations.ipynb` — supplemental notebook for exploring missing september civil summons data. 
+- `3-analysis_EDA/archived-workbooks/` — older notebook versions 
+
+### Geocoding notebooks
+
+- `4-geocoding/geocoding.ipynb` — geocodes civil summons addresses and matches to census blocks.
+
+### Arrests and 911 calls notebooks
+
+- `5-arrests_911_calls/ArrestDataCode.ipynb` — cleans and processes NYPD arrest records.
+- `5-arrests_911_calls/911CallCode.ipynb` — cleans and processes 911 call records.
+- `5-arrests_911_calls/merge_geocode_arrests.ipynb` — merges geocoded civil summons with arrest/call data.
+
+### Tidying for analysis
+
+- `6-tidying_for_analysis/clean_v7_model_6.1.26.ipynb` — final analysis-specific cleaning before modeling.
 
 ### Model files
 
-- `4-models/model_v8.Rmd` — R Markdown notebook for negative binomial models and EDA.
-- `4-models/exploring_sept_citations.ipynb` — supplemental notebook for exploring civil summons data.
-- `4-models/model_data/` — model-ready datasets and version history.
+- `7-models/model_v8.Rmd` — R Markdown notebook for negative binomial models and EDA.
+- `7-models/model_data/` — model-ready datasets and version history.
 
 ### Merge support files
 
@@ -202,9 +277,11 @@ To recreate the pipeline from a fresh clone:
 3. Run the raw citation cleaning notebook in `1-cleaning_raw_citations/`.
 4. Run the officer demographic merge in `2-cleaning_officer_dem/`.
 5. Run the master dataset notebook in `3-analysis_EDA/`.
-6. Run the analysis-specific cleanup notebook.
-7. Run `4-models/model_v8.Rmd` for the modeling output.
-8. Compare generated outputs against the committed CSVs in `4-models/model_data/` and the other stage folders.
+6. Run the geocoding notebook in `4-geocoding/`.
+7. Run the arrest and 911 call notebooks in `5-arrests_911_calls/`.
+8. Run the analysis-specific cleanup notebook in `6-tidying_for_analysis/`.
+9. Run `7-models/model_v8.Rmd` for the modeling output.
+10. Compare generated outputs against the committed CSVs in `7-models/model_data/` and the other stage folders.
 
 ## Suggested Local Setup
 
@@ -218,9 +295,7 @@ If you want a reproducible environment, create one per language and keep package
 ## Data Notes
 
 - This repository currently centers on the 2021 civil summons workflow.
-- Some filenames and notes reference 2022 raw file collection, but the committed tree here contains the 2021 pipeline materials.
-- Versioned CSVs are intentionally stored in the repo to make the analysis reproducible even if earlier notebooks change.
-- Some files appear to be generated from spreadsheets or manual merges; those are preserved as intermediate artifacts rather than source-of-truth inputs.
+- Versioned CSVs are stored in the repo to make the analysis reproducible even if earlier notebooks change.
 
 ## Output Conventions
 
@@ -239,8 +314,8 @@ When updating the pipeline:
 
 ## Citation / Use
 
-This repository is maintained for research and educational work by the Evidence for Justice Lab. If you build on this code or data, cite the project and note the dataset version you used.
+This repository is maintained for research by the Evidence for Justice Lab. If you build on this code or data, cite the project and note the dataset version you used.
 
 ## Contact
 
-For questions about the workflow, pipeline structure, or data definitions, contact the Evidence for Justice Lab team or the repository maintainer.
+For questions about the workflow, pipeline structure, or data definitions, contact the Evidence for Justice Lab team. 
